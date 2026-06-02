@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Chấm Điểm Phát Âm Tiếng Trung</title>
+
+<style>
+
+body{
+    font-family: Arial, sans-serif;
+    background:#f4f6f9;
+    padding:30px;
+}
+
+.container{
+    max-width:800px;
+    margin:auto;
+    background:white;
+    padding:25px;
+    border-radius:15px;
+    box-shadow:0 0 15px rgba(0,0,0,.1);
+}
+
+h1{
+    text-align:center;
+}
+
+.target{
+    font-size:32px;
+    text-align:center;
+    color:#1976d2;
+    margin:20px 0;
+}
+
+button{
+    padding:12px 20px;
+    border:none;
+    border-radius:8px;
+    cursor:pointer;
+    margin:5px;
+    font-size:16px;
+}
+
+.listen{
+    background:#4caf50;
+    color:white;
+}
+
+.record{
+    background:#e53935;
+    color:white;
+}
+
+.result{
+    margin-top:20px;
+}
+
+.score{
+    font-size:60px;
+    font-weight:bold;
+    text-align:center;
+    color:#2196f3;
+}
+
+.correct{
+    color:green;
+    font-weight:bold;
+}
+
+.wrong{
+    color:red;
+    font-weight:bold;
+}
+
+.status{
+    text-align:center;
+    font-size:18px;
+    margin-top:10px;
+}
+
+.feedback{
+    text-align:center;
+    font-size:22px;
+    margin-top:15px;
+}
+
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<h1>普通话发音评分系统</h1>
+
+<div class="target" id="targetText">
+你好，我叫王明。
+</div>
+
+<center>
+
+<button class="listen" onclick="playSample()">
+🔊 Nghe mẫu
+</button>
+
+<button class="record" onclick="startRecognition()">
+🎤 Bắt đầu đọc
+</button>
+
+</center>
+
+<div class="status" id="status"></div>
+
+<div class="result">
+
+<h3>Kết quả nhận dạng:</h3>
+
+<div id="recognized"></div>
+
+<h3>So sánh:</h3>
+
+<div id="compare"></div>
+
+<div class="score" id="score">0</div>
+
+<div class="feedback" id="feedback"></div>
+
+</div>
+
+</div>
+
+<script>
+
+const targetSentence = "你好，我叫王明。";
+
+function playSample(){
+
+    const msg = new SpeechSynthesisUtterance(
+        targetSentence
+    );
+
+    msg.lang = "zh-CN";
+    msg.rate = 0.9;
+
+    speechSynthesis.cancel();
+    speechSynthesis.speak(msg);
+}
+
+function startRecognition(){
+
+    const SpeechRecognition =
+        window.SpeechRecognition ||
+        window.webkitSpeechRecognition;
+
+    if(!SpeechRecognition){
+
+        alert(
+            "Chrome mới hỗ trợ tính năng này."
+        );
+
+        return;
+    }
+
+    const recognition =
+        new SpeechRecognition();
+
+    recognition.lang = "zh-CN";
+    recognition.interimResults = false;
+    recognition.continuous = false;
+
+    document.getElementById("status").innerHTML =
+        "🎤 Đang nghe...";
+
+    recognition.start();
+
+    recognition.onresult = function(event){
+
+        const text =
+            event.results[0][0].transcript;
+
+        document.getElementById(
+            "recognized"
+        ).innerHTML = text;
+
+        calculateScore(
+            targetSentence,
+            text
+        );
+    };
+
+    recognition.onerror = function(e){
+
+        document.getElementById(
+            "status"
+        ).innerHTML =
+            "❌ " + e.error;
+    };
+
+    recognition.onend = function(){
+
+        document.getElementById(
+            "status"
+        ).innerHTML =
+            "✅ Hoàn thành";
+    };
+}
+
+function levenshtein(a,b){
+
+    const matrix=[];
+
+    for(let i=0;i<=b.length;i++){
+        matrix[i]=[i];
+    }
+
+    for(let j=0;j<=a.length;j++){
+        matrix[0][j]=j;
+    }
+
+    for(let i=1;i<=b.length;i++){
+
+        for(let j=1;j<=a.length;j++){
+
+            if(
+                b.charAt(i-1) ===
+                a.charAt(j-1)
+            ){
+                matrix[i][j] =
+                    matrix[i-1][j-1];
+            }
+            else{
+
+                matrix[i][j] = Math.min(
+                    matrix[i-1][j-1]+1,
+                    matrix[i][j-1]+1,
+                    matrix[i-1][j]+1
+                );
+            }
+        }
+    }
+
+    return matrix[b.length][a.length];
+}
+
+function calculateScore(target,spoken){
+
+    const distance =
+        levenshtein(target,spoken);
+
+    const maxLen =
+        Math.max(
+            target.length,
+            spoken.length
+        );
+
+    let score =
+        Math.round(
+            (1-distance/maxLen)*100
+        );
+
+    if(score < 0) score = 0;
+
+    document.getElementById(
+        "score"
+    ).innerHTML = score;
+
+    highlightResult(
+        target,
+        spoken
+    );
+
+    let feedback="";
+
+    if(score >= 95){
+
+        feedback =
+        "🌟 Xuất sắc - rất giống người bản xứ";
+
+    }else if(score >= 85){
+
+        feedback =
+        "👍 Rất tốt";
+
+    }else if(score >= 70){
+
+        feedback =
+        "🙂 Khá tốt";
+
+    }else if(score >= 50){
+
+        feedback =
+        "📚 Cần luyện thêm";
+
+    }else{
+
+        feedback =
+        "❌ Đọc lại câu";
+    }
+
+    document.getElementById(
+        "feedback"
+    ).innerHTML = feedback;
+}
+
+function highlightResult(target, spoken){
+
+    let html = "";
+
+    const max =
+        Math.max(
+            target.length,
+            spoken.length
+        );
+
+    for(let i=0;i<max;i++){
+
+        const t = target[i] || "";
+        const s = spoken[i] || "";
+
+        if(t === s){
+
+            html +=
+            `<span class="correct">${s}</span>`;
+
+        }else{
+
+            html +=
+            `<span class="wrong">${s || "_"}</span>`;
+        }
+    }
+
+    document.getElementById(
+        "compare"
+    ).innerHTML = html;
+}
+
+</script>
+
+</body>
+</html>
